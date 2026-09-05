@@ -9,12 +9,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Chuyển status sang string để dễ bổ sung trạng thái mới.
-        DB::statement("
-            ALTER TABLE bookings
-            MODIFY status VARCHAR(30)
-            NOT NULL DEFAULT 'pending'
-        ");
+        // Câu lệnh MODIFY chỉ dùng được với MySQL.
+        // Kiểm tra driver để migration không bị lỗi khi môi trường dùng SQLite.
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("
+                ALTER TABLE bookings
+                MODIFY status VARCHAR(30)
+                NOT NULL DEFAULT 'pending'
+            ");
+        }
 
         Schema::table('bookings', function (Blueprint $table) {
             $table->string('payment_status', 30)
@@ -36,15 +39,17 @@ return new class extends Migration
             ]);
         });
 
-        DB::statement("
-            ALTER TABLE bookings
-            MODIFY status ENUM(
-                'pending',
-                'confirmed',
-                'completed',
-                'cancelled'
-            )
-            NOT NULL DEFAULT 'pending'
-        ");
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("
+                ALTER TABLE bookings
+                MODIFY status ENUM(
+                    'pending',
+                    'confirmed',
+                    'completed',
+                    'cancelled'
+                )
+                NOT NULL DEFAULT 'pending'
+            ");
+        }
     }
 };
