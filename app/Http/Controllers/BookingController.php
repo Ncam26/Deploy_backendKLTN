@@ -528,6 +528,19 @@ class BookingController extends Controller
 
             if ($action === 'mark_paid') {
                 $this->markBookingPaid($booking);
+
+                /*
+                 * Với chuyển khoản, thao tác "Đã nhận tiền" là bước
+                 * xác nhận cuối cùng của admin. Xác nhận lịch ngay trong
+                 * cùng transaction để không xảy ra trạng thái đã thu tiền
+                 * nhưng phiếu vẫn còn chờ xác nhận.
+                 */
+                if (
+                    $booking->payment_method === 'bank_transfer' &&
+                    $booking->status === 'pending'
+                ) {
+                    $this->confirmBooking($booking);
+                }
             }
 
             $booking->refresh();
@@ -566,8 +579,9 @@ class BookingController extends Controller
         $emailSent = false;
 
         if (
-            $data['action'] === 'confirm' &&
+            in_array($data['action'], ['confirm', 'mark_paid'], true) &&
             $updatedBooking->payment_method === 'bank_transfer' &&
+            $updatedBooking->status === 'confirmed' &&
             $updatedBooking->payment_status === 'paid'
         ) {
             try {

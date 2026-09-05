@@ -128,18 +128,15 @@ class BadmintonApiTest extends TestCase
             ['action' => 'confirm']
         )->assertStatus(422);
 
-        $this->putJson(
-            "/api/admin/bookings/{$bookingId}/process",
-            ['action' => 'mark_paid']
-        )->assertOk();
-
         Mail::fake();
 
         $this->putJson(
             "/api/admin/bookings/{$bookingId}/process",
-            ['action' => 'confirm']
+            ['action' => 'mark_paid']
         )->assertOk()
-            ->assertJsonPath('email_sent', true);
+            ->assertJsonPath('email_sent', true)
+            ->assertJsonPath('booking.status', 'confirmed')
+            ->assertJsonPath('booking.payment_status', 'paid');
 
         Mail::assertSent(
             BookingConfirmedMail::class,
