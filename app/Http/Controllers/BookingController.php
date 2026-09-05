@@ -2,17 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\BookingConfirmedMail;
 use App\Models\Booking;
 use App\Models\BookingHistory;
 use App\Models\Court;
 use App\Models\Notification;
 use App\Models\RepairTicket;
+use App\Services\TransactionalMailService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 
 class BookingController extends Controller
@@ -585,12 +584,8 @@ class BookingController extends Controller
             $updatedBooking->payment_status === 'paid'
         ) {
             try {
-                Mail::to($updatedBooking->user->email)
-                    ->send(
-                        new BookingConfirmedMail(
-                            $updatedBooking
-                        )
-                    );
+                app(TransactionalMailService::class)
+                    ->sendBookingConfirmation($updatedBooking);
 
                 $emailSent = true;
                 $message = 'Đã xác nhận phiếu và gửi email cho khách hàng.';
@@ -603,7 +598,7 @@ class BookingController extends Controller
                     ]
                 );
 
-                $message = 'Đã xác nhận phiếu nhưng chưa gửi được email. Vui lòng kiểm tra cấu hình Gmail.';
+                $message = 'Đã xác nhận phiếu nhưng chưa gửi được email. Vui lòng kiểm tra cấu hình dịch vụ gửi thư.';
             }
         }
 

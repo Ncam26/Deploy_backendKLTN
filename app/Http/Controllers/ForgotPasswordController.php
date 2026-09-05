@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\PasswordResetOtp;
 use App\Models\User;
+use App\Services\TransactionalMailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 
 class ForgotPasswordController extends Controller
 {
@@ -77,10 +77,7 @@ class ForgotPasswordController extends Controller
         $userName = $user->name;
         $otpRecordId = $otpRecord->id;
 
-        /*
-         * Railway có thể mất khá lâu để mở kết nối SMTP Gmail lần đầu.
-         * Gửi sau response để trình duyệt không bị 502 và hiểu nhầm là lỗi CORS.
-         */
+        // Gửi sau response để API phản hồi nhanh cho giao diện.
         dispatch(function () use (
             $email,
             $userName,
@@ -88,16 +85,12 @@ class ForgotPasswordController extends Controller
             $otpRecordId
         ) {
             try {
-                Mail::raw(
-                    "Xin chào {$userName},\n\n"
-                    ."Mã xác nhận đặt lại mật khẩu của bạn là: {$otp}\n\n"
-                    ."Mã này có hiệu lực trong 5 phút.\n"
-                    ."Nếu bạn không yêu cầu đổi mật khẩu, hãy bỏ qua email này.",
-                    function ($mail) use ($email) {
-                        $mail->to($email)
-                            ->subject('Mã xác nhận đặt lại mật khẩu');
-                    }
-                );
+                app(TransactionalMailService::class)
+                    ->sendPasswordResetOtp(
+                        $email,
+                        $userName,
+                        $otp
+                    );
             } catch (\Throwable $error) {
                 PasswordResetOtp::whereKey($otpRecordId)->delete();
                 report($error);
