@@ -73,26 +73,36 @@ class ForgotPasswordController extends Controller
             ]
         );
 
-        try {
-            Mail::raw(
-                "Xin chào {$user->name},\n\n"
-                ."Mã xác nhận đặt lại mật khẩu của bạn là: {$otp}\n\n"
-                ."Mã này có hiệu lực trong 5 phút.\n"
-                ."Nếu bạn không yêu cầu đổi mật khẩu, hãy bỏ qua email này.",
-                function ($mail) use ($data) {
-                    $mail->to($data['email'])
-                        ->subject('Mã xác nhận đặt lại mật khẩu');
-                }
-            );
-        } catch (\Throwable $error) {
-            $otpRecord->delete();
+        $email = $data['email'];
+        $userName = $user->name;
+        $otpRecordId = $otpRecord->id;
 
-            report($error);
-
-            return response()->json([
-                'message' => 'Không thể gửi email. Vui lòng kiểm tra cấu hình Gmail.',
-            ], 500);
-        }
+        /*
+         * Railway có thể mất khá lâu để mở kết nối SMTP Gmail lần đầu.
+         * Gửi sau response để trình duyệt không bị 502 và hiểu nhầm là lỗi CORS.
+         */
+        dispatch(function () use (
+            $email,
+            $userName,
+            $otp,
+            $otpRecordId
+        ) {
+            try {
+                Mail::raw(
+                    "Xin chào {$userName},\n\n"
+                    ."Mã xác nhận đặt lại mật khẩu của bạn là: {$otp}\n\n"
+                    ."Mã này có hiệu lực trong 5 phút.\n"
+                    ."Nếu bạn không yêu cầu đổi mật khẩu, hãy bỏ qua email này.",
+                    function ($mail) use ($email) {
+                        $mail->to($email)
+                            ->subject('Mã xác nhận đặt lại mật khẩu');
+                    }
+                );
+            } catch (\Throwable $error) {
+                PasswordResetOtp::whereKey($otpRecordId)->delete();
+                report($error);
+            }
+        })->afterResponse();
 
         return response()->json([
             'message' => $message,
